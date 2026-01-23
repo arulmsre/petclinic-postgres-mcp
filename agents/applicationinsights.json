@@ -1,0 +1,23 @@
+{
+  "sampling": {
+    "percentage": 100,
+    "overrides": [
+      {
+        "telemetryType": "dependency",
+        "attributes": [
+          {
+            "key": "url.path",
+            "value": ".*github.com.*",
+            "matchType": "regexp"
+          },
+          {
+            "key": "url.path",
+            "value": ".*actuator/.*",
+            "matchType": "regexp"
+          }
+        ],
+        "percentage": 0
+      }
+    ]
+  }
+}

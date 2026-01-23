@@ -1,0 +1,67 @@
+# Grafana MCP Server with HTTP Bridge
+# Combined image that wraps the stdio MCP server with HTTP interface
+
+FROM node:18-alpine AS mcp-server-builder
+
+WORKDIR /mcp-server
+
+# Build Grafana MCP Server
+COPY grafana-mcp-server/package.json grafana-mcp-server/package-lock.json ./
+RUN npm ci --prefer-offline --no-audit --ignore-scripts
+
+COPY grafana-mcp-server/tsconfig.json ./
+COPY grafana-mcp-server/src/ ./src/
+RUN npm run build
+
+# Build HTTP Bridge
+FROM node:18-alpine AS bridge-builder
+
+WORKDIR /bridge
+
+COPY mcp-http-bridge/package.json mcp-http-bridge/package-lock.json* ./
+RUN npm install --ignore-scripts || npm ci --ignore-scripts || true
+
+COPY mcp-http-bridge/tsconfig.json ./
+COPY mcp-http-bridge/src/ ./src/
+RUN npm run build || npx tsc
+
+# Final production image
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy MCP server
+COPY --from=mcp-server-builder /mcp-server/node_modules ./mcp-server/node_modules
+COPY --from=mcp-server-builder /mcp-server/dist ./mcp-server/dist
+COPY --from=mcp-server-builder /mcp-server/package.json ./mcp-server/
+
+# Copy HTTP bridge
+COPY --from=bridge-builder /bridge/node_modules ./bridge/node_modules
+COPY --from=bridge-builder /bridge/dist ./bridge/dist
+COPY --from=bridge-builder /bridge/package.json ./bridge/
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001 && \
+    chown -R nodejs:nodejs /app
+
+USER nodejs
+
+# Environment variables
+ENV PORT=3000
+ENV MCP_COMMAND=node
+ENV MCP_ARGS=dist/index.js
+ENV MCP_CWD=/app/mcp-server
+ENV GRAFANA_URL=http://grafana.petclinic.svc.cluster.local:80
+ENV GRAFANA_USER=admin
+ENV GRAFANA_PASSWORD=admin
+ENV NODE_ENV=production
+
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
+
+WORKDIR /app/bridge
+CMD ["node", "dist/index.js"]

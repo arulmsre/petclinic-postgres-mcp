@@ -1,0 +1,8 @@
+.git
+.gitignore
+.vscode
+.mvn
+*.md
+*.log
+docker-compose.yml
+docker-compose.override.yml
