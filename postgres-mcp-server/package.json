@@ -1,0 +1,29 @@
+{
+  "name": "postgres-mcp-server",
+  "version": "1.0.0",
+  "description": "Model Context Protocol server for Azure PostgreSQL integration",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc && node -e \"require('fs').chmodSync('dist/index.js', '755')\"",
+    "watch": "tsc --watch",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "postgresql",
+    "azure",
+    "database"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "pg": "^8.11.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/pg": "^8.10.9",
+    "typescript": "^5.7.2"
+  }
+}

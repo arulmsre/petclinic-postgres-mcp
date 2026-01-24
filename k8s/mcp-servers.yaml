@@ -1,0 +1,303 @@
+# Kubernetes Deployment for MCP Servers
+# Deploys Prometheus and Grafana MCP servers to existing AKS cluster
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: petclinic
+
+---
+# Prometheus MCP Server Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-mcp
+  namespace: petclinic
+  labels:
+    app: prometheus-mcp
+    component: mcp-server
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: prometheus-mcp
+  template:
+    metadata:
+      labels:
+        app: prometheus-mcp
+        component: mcp-server
+    spec:
+      containers:
+      - name: prometheus-mcp
+        image: petclinicdemo1234.azurecr.io/prometheus-mcp-http:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+          name: http
+          protocol: TCP
+        env:
+        - name: PORT
+          value: "3000"
+        - name: MCP_COMMAND
+          value: "node"
+        - name: MCP_ARGS
+          value: "dist/index.js"
+        - name: MCP_CWD
+          value: "/app/mcp-server"
+        - name: PROMETHEUS_URL
+          value: "http://prometheus.petclinic.svc.cluster.local:9090"
+        - name: NODE_ENV
+          value: "production"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+
+---
+# Prometheus MCP Service (NodePort for port-forward access)
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-mcp-service
+  namespace: petclinic
+  labels:
+    app: prometheus-mcp
+spec:
+  type: NodePort
+  ports:
+  - port: 80
+    targetPort: 3000
+    nodePort: 30090
+    protocol: TCP
+    name: http
+  selector:
+    app: prometheus-mcp
+
+---
+# Grafana MCP Server Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana-mcp
+  namespace: petclinic
+  labels:
+    app: grafana-mcp
+    component: mcp-server
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: grafana-mcp
+  template:
+    metadata:
+      labels:
+        app: grafana-mcp
+        component: mcp-server
+    spec:
+      containers:
+      - name: grafana-mcp
+        image: petclinicdemo1234.azurecr.io/grafana-mcp-http:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+          name: http
+          protocol: TCP
+        env:
+        - name: PORT
+          value: "3000"
+        - name: MCP_COMMAND
+          value: "node"
+        - name: MCP_ARGS
+          value: "dist/index.js"
+        - name: MCP_CWD
+          value: "/app/mcp-server"
+        - name: GRAFANA_URL
+          value: "http://grafana.petclinic.svc.cluster.local:80"
+        - name: GRAFANA_USER
+          value: "admin"
+        - name: GRAFANA_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: grafana-mcp-secrets
+              key: password
+              optional: true
+        - name: NODE_ENV
+          value: "production"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+
+---
+# Grafana MCP Service (NodePort for port-forward access)
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-mcp-service
+  namespace: petclinic
+  labels:
+    app: grafana-mcp
+spec:
+  type: NodePort
+  ports:
+  - port: 80
+    targetPort: 3000
+    nodePort: 30091
+    protocol: TCP
+    name: http
+  selector:
+    app: grafana-mcp
+
+---
+# PostgreSQL MCP Server Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-mcp
+  namespace: petclinic
+  labels:
+    app: postgres-mcp
+    component: mcp-server
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: postgres-mcp
+  template:
+    metadata:
+      labels:
+        app: postgres-mcp
+        component: mcp-server
+    spec:
+      containers:
+      - name: postgres-mcp
+        image: petclinicdemo1234.azurecr.io/postgres-mcp-http:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+          name: http
+          protocol: TCP
+        env:
+        - name: PORT
+          value: "3000"
+        - name: MCP_COMMAND
+          value: "node"
+        - name: MCP_ARGS
+          value: "dist/index.js"
+        - name: MCP_CWD
+          value: "/app/mcp-server"
+        - name: PG_HOST
+          value: "postgres.petclinic.svc.cluster.local"
+        - name: PG_PORT
+          value: "5432"
+        - name: PG_DATABASE
+          value: "petclinic"
+        - name: PG_USER
+          value: "petclinic"
+        - name: PG_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-mcp-secrets
+              key: password
+              optional: true
+        - name: PG_SSL
+          value: "false"
+        - name: NODE_ENV
+          value: "production"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+
+---
+# PostgreSQL MCP Service (NodePort for port-forward access)
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-mcp-service
+  namespace: petclinic
+  labels:
+    app: postgres-mcp
+spec:
+  type: NodePort
+  ports:
+  - port: 80
+    targetPort: 3000
+    nodePort: 30092
+    protocol: TCP
+    name: http
+  selector:
+    app: postgres-mcp
+
+---
+# Secret for Grafana credentials (create separately)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-mcp-secrets
+  namespace: petclinic
+type: Opaque
+stringData:
+  password: "admin"  # Change this in production!
+
+---
+# Secret for PostgreSQL credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-mcp-secrets
+  namespace: petclinic
+type: Opaque
+stringData:
+  password: "petclinic"  # Change this in production!

@@ -1,0 +1,202 @@
+version: '3.8'
+
+services:
+  config-server:
+    build:
+      context: ./spring-petclinic-config-server
+      dockerfile: ../docker/Dockerfile
+      args:
+        ARTIFACT_NAME: target/spring-petclinic-config-server-3.2.4
+        EXPOSED_PORT: 8888
+    image: srepetclinic/spring-petclinic-config-server
+    container_name: config-server
+    environment:
+      - SERVER_PORT=8888
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - 8888:8888
+    restart: always
+
+  discovery-server:
+    build:
+      context: ./spring-petclinic-discovery-server
+      dockerfile: ../docker/Dockerfile
+      args:
+        ARTIFACT_NAME: target/spring-petclinic-discovery-server-3.2.4
+    image: srepetclinic/spring-petclinic-discovery-server
+    container_name: discovery-server
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    depends_on:
+      config-server:
+        condition: service_healthy
+    ports:
+      - 8761:8761
+    restart: always
+
+  customers-service:
+    build:
+      context: ./spring-petclinic-customers-service
+      dockerfile: ../docker/Dockerfile
+      args:
+        ARTIFACT_NAME: target/spring-petclinic-customers-service-3.2.4
+    image: srepetclinic/spring-petclinic-customers-service
+    container_name: customers-service
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    ports:
+      - 8081:8081
+    restart: always
+
+  visits-service:
+    build:
+      context: ./spring-petclinic-visits-service
+      dockerfile: ../docker/Dockerfile
+      args:
+        ARTIFACT_NAME: target/spring-petclinic-visits-service-3.2.4
+    image: srepetclinic/spring-petclinic-visits-service
+    container_name: visits-service
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    ports:
+      - 8082:8082
+    restart: always
+
+  vets-service:
+    build:
+      context: ./spring-petclinic-vets-service
+      dockerfile: ../docker/Dockerfile
+      args:
+        ARTIFACT_NAME: target/spring-petclinic-vets-service-3.2.4
+    image: srepetclinic/spring-petclinic-vets-service
+    container_name: vets-service
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    ports:
+      - 8083:8083
+    restart: always
+
+  api-gateway:
+    build:
+      context: ./spring-petclinic-api-gateway
+      dockerfile: ../docker/Dockerfile
+      args:
+        ARTIFACT_NAME: target/spring-petclinic-api-gateway-3.2.4
+    image: srepetclinic/spring-petclinic-api-gateway
+    container_name: api-gateway
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    ports:
+      - 8080:8080
+    restart: always
+
+  tracing-server:
+    image: openzipkin/zipkin
+    container_name: tracing-server
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    environment:
+      - JAVA_OPTS=-XX:+UnlockExperimentalVMOptions -Djava.security.egd=file:/dev/./urandom
+    ports:
+      - 9411:9411
+    restart: always
+
+  admin-server:
+    build:
+      context: ./spring-petclinic-admin-server
+      dockerfile: ../docker/Dockerfile
+      args:
+        ARTIFACT_NAME: target/spring-petclinic-admin-server-3.2.4
+    image: srepetclinic/spring-petclinic-admin-server
+    container_name: admin-server
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    ports:
+      - 9090:9090
+    restart: always
+
+  grafana-server:
+    image: grafana/grafana
+    container_name: grafana-server
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    ports:
+      - 3000:3000
+    restart: always
+
+  prometheus-server:
+    image: prom/prometheus
+    container_name: prometheus-server
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yml
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    ports:
+      - 9091:9090
+    restart: always
