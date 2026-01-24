@@ -15,7 +15,7 @@ param(
     [string]$AksName = "petclinic-aks",
     
     [Parameter(Mandatory=$false)]
-    [string]$PostgresServerName = "petclinic-postgres-server",
+    [string]$PostgresServerName = "petclinic-postgres-db",
     
     [Parameter(Mandatory=$false)]
     [string]$PostgresAdminUser = "petclinicadmin",
@@ -27,10 +27,10 @@ param(
     [string]$PostgresDatabase = "petclinic",
     
     [Parameter(Mandatory=$false)]
-    [int]$AksNodeCount = 3,
+    [int]$AksNodeCount = 2,
     
     [Parameter(Mandatory=$false)]
-    [string]$AksNodeSize = "Standard_DS2_v2",
+    [string]$AksNodeSize = "Standard_DC2s_v3",
     
     [Parameter(Mandatory=$false)]
     [switch]$SkipLogin,
@@ -101,13 +101,24 @@ try {
     # Check Maven (only if not skipping build)
     if (-not $SkipBuild) {
         Write-Info "Checking Maven..."
-        $mvnVersion = mvn --version 2>$null
-        if ($LASTEXITCODE -ne 0) {
-            Write-Error-Custom "Maven is not installed or not in PATH. Please install from: https://maven.apache.org/download.cgi"
-            Write-Info "Alternatively, run the script with -SkipBuild flag if images are already built"
-            exit 1
+        
+        # Check if Maven wrapper exists
+        $mvnwPath = Join-Path $PSScriptRoot "mvnw.cmd"
+        if (Test-Path $mvnwPath) {
+            Write-Success "Maven wrapper (mvnw.cmd) found - will use it for building"
+            $script:MavenCommand = $mvnwPath
+        } else {
+            # Check for system Maven
+            $mvnVersion = mvn --version 2>$null
+            if ($LASTEXITCODE -ne 0) {
+                Write-Error-Custom "Maven is not installed or not in PATH, and mvnw.cmd wrapper not found."
+                Write-Info "Please install Maven from: https://maven.apache.org/download.cgi"
+                Write-Info "Alternatively, run the script with -SkipBuild flag if images are already built"
+                exit 1
+            }
+            Write-Success "Maven is installed"
+            $script:MavenCommand = "mvn"
         }
-        Write-Success "Maven is installed"
         
         # Check Docker
         Write-Info "Checking Docker..."
@@ -161,6 +172,28 @@ try {
             }
             Write-Success "Resource group created successfully"
         }
+        
+        # Register required resource providers
+        Write-Info "Registering required Azure resource providers..."
+        $providers = @(
+            "Microsoft.ContainerRegistry",
+            "Microsoft.ContainerService", 
+            "Microsoft.Insights",
+            "Microsoft.DBforPostgreSQL",
+            "Microsoft.OperationalInsights"
+        )
+        
+        foreach ($provider in $providers) {
+            Write-Info "Checking provider: $provider"
+            $providerStatus = az provider show --namespace $provider --query "registrationState" -o tsv 2>&1
+            if ($providerStatus -ne "Registered") {
+                Write-Info "Registering $provider..."
+                az provider register --namespace $provider --wait
+            } else {
+                Write-Info "$provider already registered"
+            }
+        }
+        Write-Success "All required resource providers are registered"
     } else {
         Write-Info "Skipping resource group creation"
     }
@@ -171,40 +204,62 @@ try {
     if (-not $SkipResourceCreation) {
         Write-Step "STEP 3: Creating Azure Container Registry"
         
-        # Check if ACR exists
-        Write-Info "Checking if ACR exists..."
-        $acrCheck = az acr show --name $AcrName --resource-group $ResourceGroupName 2>$null
-        $acrCheckResult = $LASTEXITCODE
+        # Check if ACR exists (in current resource group)
+        Write-Info "Checking if ACR exists in resource group '$ResourceGroupName'..."
+        $previousErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'SilentlyContinue'
+        $acrCheck = az acr show --name $AcrName --resource-group $ResourceGroupName 2>&1
+        $acrExistsInRg = $?
+        $ErrorActionPreference = $previousErrorActionPreference
         
-        if ($acrCheckResult -eq 0) {
-            Write-Info "ACR '$AcrName' already exists"
+        if ($acrExistsInRg) {
+            Write-Success "ACR '$AcrName' already exists in resource group"
         } else {
-            Write-Info "Creating ACR: $AcrName"
-            az acr create `
-                --resource-group $ResourceGroupName `
-                --name $AcrName `
-                --sku Basic `
-                --admin-enabled true
+            # Check if ACR exists globally (might be in different RG)
+            Write-Info "Checking if ACR '$AcrName' exists globally..."
+            $previousErrorActionPreference = $ErrorActionPreference
+            $ErrorActionPreference = 'SilentlyContinue'
+            $acrGlobalCheck = az acr show --name $AcrName 2>&1
+            $acrExistsGlobally = $?
+            $ErrorActionPreference = $previousErrorActionPreference
             
-            if ($LASTEXITCODE -ne 0) {
-                throw "Failed to create ACR"
+            if ($acrExistsGlobally) {
+                Write-Success "ACR '$AcrName' exists and is accessible"
+                Write-Info "Using existing ACR (may be in a different resource group)"
+            } else {
+                Write-Info "Creating ACR: $AcrName"
+                az acr create `
+                    --resource-group $ResourceGroupName `
+                    --name $AcrName `
+                    --sku Basic `
+                    --admin-enabled true
+                
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Error-Custom "Failed to create ACR. The DNS name '$AcrName.azurecr.io' may be taken by another subscription."
+                    Write-Info "Please choose a different ACR name using: -AcrName parameter"
+                    throw "Failed to create ACR"
+                }
+                Write-Success "ACR created successfully"
+                
+                # Wait for ACR to be fully provisioned
+                Write-Info "Waiting for ACR to be ready..."
+                Start-Sleep -Seconds 10
             }
-            Write-Success "ACR created successfully"
-            
-            # Wait for ACR to be fully provisioned
-            Write-Info "Waiting for ACR to be ready..."
-            Start-Sleep -Seconds 10
         }
         
         # Get ACR credentials
         Write-Info "Retrieving ACR credentials..."
-        $ErrorActionPreference = "Continue"
-        $acrPassword = az acr credential show --name $AcrName --resource-group $ResourceGroupName --query "passwords[0].value" -o tsv 2>$null
-        $credResult = $LASTEXITCODE
-        $ErrorActionPreference = "Stop"
+        $previousErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'SilentlyContinue'
         
-        if ($credResult -ne 0) {
-            throw "Failed to retrieve ACR credentials. ACR may not be fully provisioned yet. Try running with -SkipResourceCreation if resources already exist."
+        # Try to get credentials - first try with resource group, then without
+        $acrPassword = az acr credential show --name $AcrName --query "passwords[0].value" -o tsv 2>&1
+        $credResult = $?
+        $ErrorActionPreference = $previousErrorActionPreference
+        
+        if (-not $credResult) {
+            Write-Error-Custom "Failed to retrieve ACR credentials. You may not have access to this ACR."
+            throw "Failed to retrieve ACR credentials"
         }
         Write-Success "ACR credentials retrieved"
     } else {
@@ -219,10 +274,13 @@ try {
         
         # Check if AKS exists
         Write-Info "Checking if AKS cluster exists..."
-        $aksCheck = az aks show --name $AksName --resource-group $ResourceGroupName 2>$null
-        $aksCheckResult = $LASTEXITCODE
+        $previousErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'SilentlyContinue'
+        $aksCheck = az aks show --name $AksName --resource-group $ResourceGroupName 2>&1
+        $aksExists = $?
+        $ErrorActionPreference = $previousErrorActionPreference
         
-        if ($aksCheckResult -eq 0) {
+        if ($aksExists) {
             Write-Info "AKS cluster '$AksName' already exists"
         } else {
             Write-Info "Creating AKS cluster: $AksName (this may take 10-15 minutes)"
@@ -258,56 +316,81 @@ try {
     }
 
     # ============================================
-    # STEP 5: Create Azure Database for PostgreSQL
+    # STEP 5: Create Azure SQL Database
     # ============================================
     if (-not $SkipResourceCreation) {
-        Write-Step "STEP 5: Creating Azure Database for PostgreSQL"
-        
-        # Check if PostgreSQL server exists
-        Write-Info "Checking if PostgreSQL server exists..."
-        $postgresCheck = az postgres flexible-server show --name $PostgresServerName --resource-group $ResourceGroupName 2>$null
-        $postgresCheckResult = $LASTEXITCODE
-        
-        if ($postgresCheckResult -eq 0) {
-            Write-Info "PostgreSQL server '$PostgresServerName' already exists"
+        Write-Step "STEP 5: Creating Azure SQL Database"
+        $SqlServerName = "petclinic-sql-server"
+        $SqlAdminUser = "petclinicadmin"
+        $SqlAdminPassword = "P@ssw0rd123!"
+        $SqlDatabase = "petclinic"
+
+        # Check if SQL server exists
+        Write-Info "Checking if SQL server exists..."
+        $previousErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'SilentlyContinue'
+        $sqlServerCheck = az sql server show --name $SqlServerName --resource-group $ResourceGroupName 2>&1
+        $sqlServerExists = $?
+        $ErrorActionPreference = $previousErrorActionPreference
+
+        if ($sqlServerExists) {
+            Write-Info "SQL server '$SqlServerName' already exists"
         } else {
-            Write-Info "Creating PostgreSQL Flexible Server: $PostgresServerName (this may take 5-10 minutes)"
-            az postgres flexible-server create `
+            Write-Info "Creating SQL server: $SqlServerName"
+            az sql server create `
+                --name $SqlServerName `
                 --resource-group $ResourceGroupName `
-                --name $PostgresServerName `
                 --location $Location `
-                --admin-user $PostgresAdminUser `
-                --admin-password $PostgresAdminPassword `
-                --sku-name Standard_B1ms `
-                --tier Burstable `
-                --storage-size 32 `
-                --version 15 `
-                --public-access 0.0.0.0-255.255.255.255
-            
+                --admin-user $SqlAdminUser `
+                --admin-password $SqlAdminPassword
             if ($LASTEXITCODE -ne 0) {
-                throw "Failed to create PostgreSQL server"
+                Write-Error-Custom "Failed to create SQL server in location '$Location'"
+                throw "Failed to create SQL server"
             }
-            Write-Success "PostgreSQL server created successfully"
+            Write-Success "SQL server created successfully"
         }
-        
-        # Create database
-        Write-Info "Creating database: $PostgresDatabase"
-        az postgres flexible-server db create `
+
+        # Check if database exists
+        Write-Info "Checking if database '$SqlDatabase' exists..."
+        $previousErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'SilentlyContinue'
+        $sqlDbCheck = az sql db show --name $SqlDatabase --server $SqlServerName --resource-group $ResourceGroupName 2>&1
+        $sqlDbExists = $?
+        $ErrorActionPreference = $previousErrorActionPreference
+
+        if ($sqlDbExists) {
+            Write-Success "Database '$SqlDatabase' already exists"
+        } else {
+            Write-Info "Creating database: $SqlDatabase"
+            az sql db create `
+                --name $SqlDatabase `
+                --server $SqlServerName `
+                --resource-group $ResourceGroupName `
+                --service-objective S0
+            if ($LASTEXITCODE -ne 0) {
+                Write-Error-Custom "Failed to create SQL database, but continuing..."
+            } else {
+                Write-Success "Database created successfully"
+            }
+        }
+
+        # Configure firewall rule for Azure services
+        Write-Info "Configuring firewall rule for Azure services..."
+        az sql server firewall-rule create `
             --resource-group $ResourceGroupName `
-            --server-name $PostgresServerName `
-            --database-name $PostgresDatabase 2>$null
-        
-        Write-Success "PostgreSQL database ready"
-        
-        # Get PostgreSQL connection string
-        $postgresHost = az postgres flexible-server show `
-            --resource-group $ResourceGroupName `
-            --name $PostgresServerName `
-            --query "fullyQualifiedDomainName" -o tsv
-        
-        Write-Info "PostgreSQL Host: $postgresHost"
+            --server $SqlServerName `
+            --name AllowAzureServices `
+            --start-ip-address 0.0.0.0 `
+            --end-ip-address 0.0.0.0
+        Write-Success "Firewall rule configured"
+
+        # Get SQL connection string
+        $sqlHost = az sql server show --name $SqlServerName --resource-group $ResourceGroupName --query "fullyQualifiedDomainName" -o tsv
+        $sqlConnectionString = "jdbc:sqlserver://$sqlHost:1433;database=$SqlDatabase;user=$SqlAdminUser@$SqlServerName;password=$SqlAdminPassword;encrypt=true;trustServerCertificate=false;hostNameInCertificate=*.database.windows.net;loginTimeout=30;"
+        Write-Info "SQL Server Host: $sqlHost"
+        Write-Info "JDBC Connection String: $sqlConnectionString"
     } else {
-        Write-Info "Skipping PostgreSQL creation"
+        Write-Info "Skipping SQL Database creation"
     }
 
     # ============================================
@@ -322,7 +405,7 @@ try {
         
         # Build PetClinic services
         Write-Info "Building PetClinic microservices..."
-        mvn clean install -DskipTests
+        & $script:MavenCommand clean install -DskipTests
         
         if ($LASTEXITCODE -ne 0) {
             throw "Maven build failed"
@@ -504,7 +587,8 @@ try {
     Write-Host "  Location:        $Location" -ForegroundColor White
     Write-Host "  ACR:             $AcrName.azurecr.io" -ForegroundColor White
     Write-Host "  AKS Cluster:     $AksName" -ForegroundColor White
-    Write-Host "  PostgreSQL:      $PostgresServerName" -ForegroundColor White
+    Write-Host "  SQL Server:      petclinic-sql-server" -ForegroundColor White
+    Write-Host "  SQL Database:    petclinic" -ForegroundColor White
     
     Write-Host "`n🌐 Application Endpoints:" -ForegroundColor Cyan
     if ($apiGatewayIP) {
@@ -550,13 +634,14 @@ try {
         Location = $Location
         ACR = "$AcrName.azurecr.io"
         AKS = $AksName
-        PostgreSQL = $PostgresServerName
+        SqlServer = "petclinic-sql-server"
+        SqlDatabase = "petclinic"
         PetClinicURL = if ($apiGatewayIP) { "http://$apiGatewayIP" } else { "Pending" }
         GrafanaURL = if ($grafanaIP) { "http://$grafanaIP" } else { "Pending" }
         MCPEndpoints = @{
             Prometheus = "http://localhost:8090"
             Grafana = "http://localhost:8091"
-            PostgreSQL = "http://localhost:8092"
+            SQL = "jdbc:sqlserver://petclinic-sql-server.database.windows.net:1433;database=petclinic;user=petclinicadmin@petclinic-sql-server;password=P@ssw0rd123!;encrypt=true;trustServerCertificate=false;hostNameInCertificate=*.database.windows.net;loginTimeout=30;"
         }
     }
     

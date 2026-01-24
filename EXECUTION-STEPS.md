@@ -57,7 +57,7 @@ cd "D:\SRE Activity\CapG_Assets\Working\cloud-sre-demo-applications\spring-petcl
 - Location: `eastus`
 - ACR: `petclinicdemo1234`
 - AKS: `petclinic-aks` (3 nodes)
-- PostgreSQL: `petclinic-postgres-server`
+- PostgreSQL: `petclinic-postgres-db`
 
 ### Option B: Custom Configuration
 
@@ -467,7 +467,7 @@ Get-Process -Name kubectl | Stop-Process -Force
 | Resource Group | `petclinic-rg` | Container for all resources |
 | ACR | `petclinicdemo1234.azurecr.io` | Docker image registry |
 | AKS | `petclinic-aks` | Kubernetes cluster (3 nodes) |
-| PostgreSQL | `petclinic-postgres-server` | Managed database |
+| PostgreSQL | `petclinic-postgres-db` | Managed database |
 
 ### Kubernetes Workloads
 

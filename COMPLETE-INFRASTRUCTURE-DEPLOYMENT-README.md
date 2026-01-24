@@ -29,7 +29,7 @@ This will deploy everything with default settings:
 - Location: `eastus`
 - ACR: `petclinicdemo1234`
 - AKS: `petclinic-aks` (3 nodes, Standard_DS2_v2)
-- PostgreSQL: `petclinic-postgres-server`
+- PostgreSQL: `petclinic-postgres-db`
 
 ### Custom Configuration
 
@@ -52,7 +52,7 @@ This will deploy everything with default settings:
 | `Location` | Azure region | `eastus` | No |
 | `AcrName` | Container registry name (globally unique) | `petclinicdemo1234` | No |
 | `AksName` | Kubernetes cluster name | `petclinic-aks` | No |
-| `PostgresServerName` | PostgreSQL server name (globally unique) | `petclinic-postgres-server` | No |
+| `PostgresServerName` | PostgreSQL server name (globally unique) | `petclinic-postgres-db` | No |
 | `PostgresAdminUser` | PostgreSQL admin username | `petclinicadmin` | No |
 | `PostgresAdminPassword` | PostgreSQL admin password | `P@ssw0rd123!` | No |
 | `PostgresDatabase` | Database name | `petclinic` | No |

@@ -15,7 +15,7 @@ param(
     [string]$AksName = "petclinic-aks",
     
     [Parameter(Mandatory=$false)]
-    [string]$PostgresServerName = "petclinic-postgres-server",
+    [string]$PostgresServerName = "petclinic-postgres-db",
     
     [Parameter(Mandatory=$false)]
     [string]$PostgresAdminUser = "petclinicadmin",
