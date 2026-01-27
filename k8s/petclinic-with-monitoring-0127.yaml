@@ -1,0 +1,1025 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: petclinic
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: config-server
+  namespace: petclinic
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: config-server
+  template:
+    metadata:
+      labels:
+        app: config-server
+    spec:
+      containers:
+        - name: config-server
+          image: springcommunity/spring-petclinic-config-server
+          ports:
+            - containerPort: 8888
+              name: metrics
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: config-server
+  namespace: petclinic
+spec:
+  selector:
+    app: config-server
+  ports:
+    - port: 8888
+      targetPort: 8888
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: discovery-server
+  namespace: petclinic
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: discovery-server
+  template:
+    metadata:
+      labels:
+        app: discovery-server
+    spec:
+      containers:
+        - name: discovery-server
+          image: arul1985/spring-petclinic-discovery-server:latest
+          ports:
+            - containerPort: 8761
+              name: metrics
+          env:
+            - name: SPRING_CLOUD_CONFIG_URI
+              value: http://config-server.petclinic.svc.cluster.local:8888
+            - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+              value: http://discovery-server.petclinic.svc.cluster.local:8761/eureka/
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: discovery-server
+  namespace: petclinic
+spec:
+  selector:
+    app: discovery-server
+  ports:
+    - port: 8761
+      targetPort: 8761
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: petclinic
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+        - name: api-gateway
+          image: arul1985/spring-petclinic-api-gateway:latest
+          ports:
+            - containerPort: 8080
+              name: metrics
+          env:
+            - name: SPRING_CLOUD_CONFIG_URI
+              value: http://config-server.petclinic.svc.cluster.local:8888
+            - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+              value: http://discovery-server.petclinic.svc.cluster.local:8761/eureka/
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: petclinic
+spec:
+  type: LoadBalancer
+  selector:
+    app: api-gateway
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: customers-service
+  namespace: petclinic
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: customers-service
+  template:
+    metadata:
+      labels:
+        app: customers-service
+    spec:
+      containers:
+        - name: customers-service
+          image: arul1985/spring-petclinic-customers-service:postgres
+          ports:
+            - containerPort: 8081
+              name: metrics
+          env:
+            - name: SPRING_CLOUD_CONFIG_URI
+              value: http://config-server.petclinic.svc.cluster.local:8888
+            - name: SPRING_CONFIG_IMPORT
+              value: optional:configserver:http://config-server.petclinic.svc.cluster.local:8888/
+            - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+              value: http://discovery-server.petclinic.svc.cluster.local:8761/eureka/
+            - name: SPRING_PROFILES_ACTIVE
+              value: docker,postgres
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://petclinic-pg-db.postgres.database.azure.com:5432/postgres
+            - name: SPRING_DATASOURCE_USERNAME
+              value: petclinicadmin
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: P@ssw0rd123!
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: customers-service
+  namespace: petclinic
+spec:
+  selector:
+    app: customers-service
+  ports:
+    - port: 8081
+      targetPort: 8081
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: visits-service
+  namespace: petclinic
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: visits-service
+  template:
+    metadata:
+      labels:
+        app: visits-service
+    spec:
+      containers:
+        - name: visits-service
+          image: arul1985/spring-petclinic-visits-service:postgres
+          ports:
+            - containerPort: 8082
+              name: metrics
+          env:
+            - name: SPRING_CLOUD_CONFIG_URI
+              value: http://config-server.petclinic.svc.cluster.local:8888
+            - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+              value: http://discovery-server.petclinic.svc.cluster.local:8761/eureka/
+            - name: SPRING_PROFILES_ACTIVE
+              value: docker,postgres
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://petclinic-pg-db.postgres.database.azure.com:5432/postgres
+            - name: SPRING_DATASOURCE_USERNAME
+              value: petclinicadmin
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: P@ssw0rd123!
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: visits-service
+  namespace: petclinic
+spec:
+  selector:
+    app: visits-service
+  ports:
+    - port: 8082
+      targetPort: 8082
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vets-service
+  namespace: petclinic
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vets-service
+  template:
+    metadata:
+      labels:
+        app: vets-service
+    spec:
+      containers:
+        - name: vets-service
+          image: arul1985/spring-petclinic-vets-service:postgres
+          ports:
+            - containerPort: 8083
+              name: metrics
+          env:
+            - name: SPRING_CLOUD_CONFIG_URI
+              value: http://config-server.petclinic.svc.cluster.local:8888
+            - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+              value: http://discovery-server.petclinic.svc.cluster.local:8761/eureka/
+            - name: SPRING_PROFILES_ACTIVE
+              value: docker,postgres
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://petclinic-pg-db.postgres.database.azure.com:5432/postgres
+            - name: SPRING_DATASOURCE_USERNAME
+              value: petclinicadmin
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: P@ssw0rd123!
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vets-service
+  namespace: petclinic
+spec:
+  selector:
+    app: vets-service
+  ports:
+    - port: 8083
+      targetPort: 8083
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admin-server
+  namespace: petclinic
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: admin-server
+  template:
+    metadata:
+      labels:
+        app: admin-server
+    spec:
+      containers:
+        - name: admin-server
+          image: arul1985/spring-petclinic-admin-server:latest
+          ports:
+            - containerPort: 9090
+              name: metrics
+          env:
+            - name: SPRING_CLOUD_CONFIG_URI
+              value: http://config-server.petclinic.svc.cluster.local:8888
+            - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+              value: http://discovery-server.petclinic.svc.cluster.local:8761/eureka/
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: admin-server
+  namespace: petclinic
+spec:
+  selector:
+    app: admin-server
+  ports:
+    - port: 9090
+      targetPort: 9090
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-collector-config
+  namespace: petclinic
+data:
+  otel-collector-config.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+          http:
+
+    processors:
+      batch: {}
+
+              - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+                value: http://discovery-server.petclinic.svc.cluster.local:8761/eureka/
+    exporters:
+      otlp/tempo:
+        endpoint: tempo.petclinic.svc.cluster.local:4317
+        tls:
+          insecure: true
+      loki:
+        endpoint: http://loki.petclinic.svc.cluster.local:3100/loki/api/v1/push
+
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [otlp/tempo]
+        logs:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [loki]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-collector
+  namespace: petclinic
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: otel-collector
+  template:
+    metadata:
+      labels:
+        app: otel-collector
+    spec:
+      containers:
+        - name: otel-collector
+          image: otel/opentelemetry-collector-contrib:0.104.0
+          args:
+            - "--config=/etc/otelcol/otel-collector-config.yaml"
+          volumeMounts:
+            - name: otel-config
+              mountPath: /etc/otelcol
+          ports:
+            - containerPort: 4317
+              name: otlp-grpc
+            - containerPort: 4318
+              name: otlp-http
+            - containerPort: 8888
+              name: metrics
+      volumes:
+        - name: otel-config
+          configMap:
+            name: otel-collector-config
+            items:
+              - key: otel-collector-config.yaml
+                path: otel-collector-config.yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: otel-collector
+  namespace: petclinic
+spec:
+  selector:
+    app: otel-collector
+  ports:
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
+    - name: otlp-http
+      port: 4318
+      targetPort: 4318
+    - name: metrics
+      port: 8888
+      targetPort: 8888
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tempo
+  namespace: petclinic
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tempo
+  template:
+    metadata:
+      labels:
+        app: tempo
+    spec:
+      containers:
+        - name: tempo
+          image: grafana/tempo:2.6.0
+          args:
+            - "-config.file=/etc/tempo/tempo.yaml"
+          ports:
+            - containerPort: 3200
+              name: http
+            - containerPort: 4317
+              name: otlp-grpc
+          volumeMounts:
+            - name: tempo-config
+              mountPath: /etc/tempo
+      volumes:
+        - name: tempo-config
+          configMap:
+            name: tempo-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tempo-config
+  namespace: petclinic
+data:
+  tempo.yaml: |
+    server:
+      http_listen_port: 3200
+
+    distributor:
+      receivers:
+        otlp:
+          protocols:
+            grpc:
+
+    storage:
+      trace:
+        backend: local
+        local:
+          path: /tmp/tempo/traces
+
+    compactor:
+      compaction:
+        block_retention: 24h
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tempo
+  namespace: petclinic
+spec:
+  selector:
+    app: tempo
+  ports:
+    - name: http
+      port: 3200
+      targetPort: 3200
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loki
+  namespace: petclinic
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: loki
+  template:
+    metadata:
+      labels:
+        app: loki
+    spec:
+      containers:
+        - name: loki
+          image: grafana/loki:3.0.0
+          args:
+            - "-config.file=/etc/loki/local-config.yaml"
+          ports:
+            - containerPort: 3100
+              name: http-metrics
+          volumeMounts:
+            - name: loki-config
+              mountPath: /etc/loki
+      volumes:
+        - name: loki-config
+          configMap:
+            name: loki-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loki-config
+  namespace: petclinic
+data:
+  local-config.yaml: |
+    auth_enabled: false
+
+    server:
+      http_listen_port: 3100
+      grpc_listen_port: 9096
+
+    common:
+      instance_addr: 127.0.0.1
+      path_prefix: /tmp/loki
+      storage:
+        filesystem:
+          chunks_directory: /tmp/loki/chunks
+          rules_directory: /tmp/loki/rules
+      replication_factor: 1
+      ring:
+        kvstore:
+          store: inmemory
+
+    schema_config:
+      configs:
+        - from: 2020-10-24
+          store: tsdb
+          object_store: filesystem
+          schema: v13
+          index:
+            prefix: index_
+            period: 24h
+
+    limits_config:
+      ingestion_rate_mb: 8
+      ingestion_burst_size_mb: 16
+      reject_old_samples: false
+      reject_old_samples_max_age: 168h
+
+    compactor:
+      working_directory: /tmp/loki/compactor
+      compaction_interval: 10m
+      retention_enabled: true
+      retention_delete_delay: 2h
+      retention_delete_worker_count: 150
+      delete_request_store: filesystem
+
+    ruler:
+      storage:
+        type: local
+        local:
+          directory: /tmp/loki/rules
+      rule_path: /tmp/loki/rules-temp
+      ring:
+        kvstore:
+          store: inmemory
+      enable_api: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: loki
+  namespace: petclinic
+spec:
+  selector:
+    app: loki
+  ports:
+    - name: http
+      port: 3100
+      targetPort: 3100
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: petclinic
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Tempo
+        type: tempo
+        access: proxy
+        url: http://tempo.petclinic.svc.cluster.local:3200
+        isDefault: false
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki.petclinic.svc.cluster.local:3100
+        isDefault: false
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus.petclinic.svc.cluster.local:9090
+        isDefault: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: petclinic
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana:11.0.0
+          ports:
+            - containerPort: 3000
+          volumeMounts:
+            - name: grafana-datasources
+              mountPath: /etc/grafana/provisioning/datasources
+            - name: grafana-dashboard-providers
+              mountPath: /etc/grafana/provisioning/dashboards
+            - name: grafana-dashboards
+              mountPath: /var/lib/grafana/dashboards
+      volumes:
+        - name: grafana-datasources
+          configMap:
+            name: grafana-datasources
+        - name: grafana-dashboard-providers
+          configMap:
+            name: grafana-dashboard-providers
+        - name: grafana-dashboards
+          configMap:
+            name: grafana-dashboards  
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: petclinic
+spec:
+  type: ClusterIP
+  selector:
+    app: grafana
+  ports:
+    - port: 80
+      targetPort: 3000
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: petclinic
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+
+    scrape_configs:
+      # Scrape the OpenTelemetry Collector metrics endpoint
+      - job_name: 'otel-collector'
+        static_configs:
+          - targets: ['otel-collector.petclinic.svc.cluster.local:8888']
+
+      # Scrape all Petclinic microservices
+      - job_name: 'petclinic-services'
+        metrics_path: '/actuator/prometheus'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - petclinic
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_namespace]
+            action: keep
+            regex: petclinic
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: (api-gateway|customers-service|visits-service|vets-service|admin-server|discovery-server|config-server)
+          - source_labels: [__meta_kubernetes_pod_container_port_name]
+            action: keep
+            regex: metrics
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            target_label: app
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+
+      # Scrape Kubernetes node metrics
+      - job_name: 'kubernetes-nodes'
+        kubernetes_sd_configs:
+          - role: node
+        relabel_configs:
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)
+
+      # Scrape Kubernetes cAdvisor metrics
+      - job_name: 'kubelet'
+        kubernetes_sd_configs:
+          - role: node
+        metrics_path: /metrics/cadvisor
+        scheme: https
+        tls_config:
+          insecure_skip_verify: true
+        relabel_configs:
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: petclinic
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus
+rules:
+  - apiGroups: [""]
+    resources:
+      - nodes
+      - nodes/proxy
+      - nodes/metrics
+      - services
+      - endpoints
+      - pods
+    verbs: ["get", "list", "watch"]
+  - apiGroups:
+      - extensions
+      - networking.k8s.io
+    resources:
+      - ingresses
+    verbs: ["get", "list", "watch"]
+  - nonResourceURLs: ["/metrics", "/metrics/cadvisor"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus
+subjects:
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: petclinic
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: petclinic
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      serviceAccountName: prometheus
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v2.52.0
+          args:
+            - "--config.file=/etc/prometheus/prometheus.yml"
+            - "--storage.tsdb.path=/prometheus"
+          ports:
+            - containerPort: 9090
+          volumeMounts:
+            - name: prometheus-config
+              mountPath: /etc/prometheus
+            - name: prometheus-storage
+              mountPath: /prometheus
+      volumes:
+        - name: prometheus-config
+          configMap:
+            name: prometheus-config
+        - name: prometheus-storage
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: petclinic
+spec:
+  type: ClusterIP
+  selector:
+    app: prometheus
+  ports:
+    - port: 9090
+      targetPort: 9090
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-providers
+  namespace: petclinic
+data:
+  providers.yaml: |
+    apiVersion: 1
+    providers:
+      - name: 'default'
+        orgId: 1
+        folder: 'Petclinic'
+        type: file
+        disableDeletion: false
+        editable: true
+        updateIntervalSeconds: 30
+        options:
+          path: /var/lib/grafana/dashboards
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: petclinic
+data:
+  jvm-dashboard.json: |
+    {
+      "id": null,
+      "title": "JVM Metrics",
+      "schemaVersion": 36,
+      "version": 1,
+      "panels": [
+        {
+          "type": "graph",
+          "title": "Heap Memory Used",
+          "targets": [
+            {
+              "expr": "jvm_memory_used_bytes{area=\"heap\"}",
+              "legendFormat": "{{instance}}"
+            }
+          ]
+        }
+      ]
+    }
+
+  spring-boot-dashboard.json: |
+    {
+      "id": null,
+      "title": "Spring Boot Metrics",
+      "schemaVersion": 36,
+      "version": 1,
+      "panels": [
+        {
+          "type": "graph",
+          "title": "HTTP Server Requests",
+          "targets": [
+            {
+              "expr": "rate(http_server_requests_seconds_count[1m])",
+              "legendFormat": "{{uri}}"
+            }
+          ]
+        }
+      ]
+    }
+
+  kubernetes-dashboard.json: |
+    {
+      "id": null,
+      "title": "Kubernetes Pods",
+      "schemaVersion": 36,
+      "version": 1,
+      "panels": [
+        {
+          "type": "graph",
+          "title": "Pod CPU Usage",
+          "targets": [
+            {
+              "expr": "rate(container_cpu_usage_seconds_total[1m])",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        }
+      ]
+    }
+
+  otel-collector-dashboard.json: |
+    {
+      "id": null,
+      "title": "OpenTelemetry Collector",
+      "schemaVersion": 36,
+      "version": 1,
+      "panels": [
+        {
+          "type": "graph",
+          "title": "OTLP Requests",
+          "targets": [
+            {
+              "expr": "rate(otelcol_receiver_accepted_spans[1m])",
+              "legendFormat": "{{receiver}}"
+            }
+          ]
+        }
+      ]
+    }
+    kubernetes-cluster-overview.json: |
+    {
+      "id": null,
+      "title": "Kubernetes Cluster Overview",
+      "schemaVersion": 36,
+      "version": 1,
+      "refresh": "10s",
+      "panels": [
+        {
+          "type": "stat",
+          "title": "Total Nodes",
+          "targets": [
+            {
+              "expr": "count(kube_node_info)"
+            }
+          ],
+          "gridPos": { "x": 0, "y": 0, "w": 4, "h": 3 }
+        },
+        {
+          "type": "stat",
+          "title": "Total Pods",
+          "targets": [
+            {
+              "expr": "count(kube_pod_info)"
+            }
+          ],
+          "gridPos": { "x": 4, "y": 0, "w": 4, "h": 3 }
+        },
+        {
+          "type": "stat",
+          "title": "Running Pods",
+          "targets": [
+            {
+              "expr": "count(kube_pod_status_phase{phase=\"Running\"})"
+            }
+          ],
+          "gridPos": { "x": 8, "y": 0, "w": 4, "h": 3 }
+        },
+        {
+          "type": "stat",
+          "title": "Pending Pods",
+          "targets": [
+            {
+              "expr": "count(kube_pod_status_phase{phase=\"Pending\"})"
+            }
+          ],
+          "gridPos": { "x": 12, "y": 0, "w": 4, "h": 3 }
+        },
+        {
+          "type": "graph",
+          "title": "Node CPU Usage",
+          "targets": [
+            {
+              "expr": "rate(node_cpu_seconds_total{mode!=\"idle\"}[5m])",
+              "legendFormat": "{{instance}}"
+            }
+          ],
+          "gridPos": { "x": 0, "y": 3, "w": 12, "h": 8 }
+        },
+        {
+          "type": "graph",
+          "title": "Node Memory Usage",
+          "targets": [
+            {
+              "expr": "node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes",
+              "legendFormat": "{{instance}}"
+            }
+          ],
+          "gridPos": { "x": 12, "y": 3, "w": 12, "h": 8 }
+        },
+        {
+          "type": "graph",
+          "title": "Pod CPU Usage",
+          "targets": [
+            {
+              "expr": "rate(container_cpu_usage_seconds_total{container!=\"\"}[5m])",
+              "legendFormat": "{{pod}}"
+            }
+          ],
+          "gridPos": { "x": 0, "y": 11, "w": 12, "h": 8 }
+        },
+        {
+          "type": "graph",
+          "title": "Pod Memory Usage",
+          "targets": [
+            {
+              "expr": "container_memory_usage_bytes{container!=\"\"}",
+              "legendFormat": "{{pod}}"
+            }
+          ],
+          "gridPos": { "x": 12, "y": 11, "w": 12, "h": 8 }
+        },
+        {
+          "type": "graph",
+          "title": "Pod Restarts",
+          "targets": [
+            {
+              "expr": "rate(kube_pod_container_status_restarts_total[5m])",
+              "legendFormat": "{{pod}}"
+            }
+          ],
+          "gridPos": { "x": 0, "y": 19, "w": 12, "h": 8 }
+        },
+        {
+          "type": "graph",
+          "title": "Network I/O",
+          "targets": [
+            {
+              "expr": "rate(container_network_receive_bytes_total[5m])",
+              "legendFormat": "{{pod}} RX"
+            },
+            {
+              "expr": "rate(container_network_transmit_bytes_total[5m])",
+              "legendFormat": "{{pod}} TX"
+            }
+          ],
+          "gridPos": { "x": 12, "y": 19, "w": 12, "h": 8 }
+        }
+      ]
+    }

@@ -72,24 +72,6 @@ spec:
 
 ---
 # Prometheus MCP Service (NodePort for port-forward access)
-
-# apiVersion: v1
-# kind: Service
-# metadata:
-#   name: prometheus-mcp-service
-#   namespace: petclinic
-#   labels:
-#     app: prometheus-mcp
-# spec:
-#   type: NodePort
-#   ports:
-#   - port: 80
-#     targetPort: 3000
-#     nodePort: 30090
-#     protocol: TCP
-#     name: http
-#   selector:
-#     app: prometheus-mcp
 apiVersion: v1
 kind: Service
 metadata:

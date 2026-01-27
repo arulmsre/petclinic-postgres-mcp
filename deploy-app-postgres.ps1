@@ -3,10 +3,12 @@
 
 param(
     [Parameter(Mandatory=$false)]
+    [int]$StartFromStep = 1,
+    [Parameter(Mandatory=$false)]
     [string]$ResourceGroupName = "petclinic-rg",
     
     [Parameter(Mandatory=$false)]
-    [string]$Location = "eastus2",
+    [string]$Location = "eastus",
     
     [Parameter(Mandatory=$false)]
     [string]$AcrName = "petclinicdemo1234",
@@ -78,320 +80,224 @@ try {
     # ============================================
     # PREREQUISITE CHECKS
     # ============================================
-    Write-Step "Checking Prerequisites"
-    
-    # Check Azure CLI
-    Write-Info "Checking Azure CLI..."
-    $azVersion = az version 2>$null
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error-Custom "Azure CLI is not installed. Please install from: https://learn.microsoft.com/en-us/cli/azure/install-azure-cli"
-        exit 1
-    }
-    Write-Success "Azure CLI is installed"
-    
-    # Check kubectl
-    Write-Info "Checking kubectl..."
-    $kubectlVersion = kubectl version --client 2>$null
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error-Custom "kubectl is not installed. Please install from: https://kubernetes.io/docs/tasks/tools/"
-        exit 1
-    }
-    Write-Success "kubectl is installed"
-    
-    # Check Maven (only if not skipping build)
-    if (-not $SkipBuild) {
-        Write-Info "Checking Maven..."
-        
-        # Check if Maven wrapper exists
-        $mvnwPath = Join-Path $PSScriptRoot "mvnw.cmd"
-        if (Test-Path $mvnwPath) {
-            Write-Success "Maven wrapper (mvnw.cmd) found - will use it for building"
-            $script:MavenCommand = $mvnwPath
-        } else {
-            # Check for system Maven
-            $mvnVersion = mvn --version 2>$null
-            if ($LASTEXITCODE -ne 0) {
-                Write-Error-Custom "Maven is not installed or not in PATH, and mvnw.cmd wrapper not found."
-                Write-Info "Please install Maven from: https://maven.apache.org/download.cgi"
-                Write-Info "Alternatively, run the script with -SkipBuild flag if images are already built"
-                exit 1
-            }
-            Write-Success "Maven is installed"
-            $script:MavenCommand = "mvn"
-        }
-        
-        # Check Docker
-        Write-Info "Checking Docker..."
-        $dockerVersion = docker --version 2>$null
+    if ($StartFromStep -le 1) {
+        Write-Step "Checking Prerequisites"
+        # Check Azure CLI
+        Write-Info "Checking Azure CLI..."
+        $azVersion = az version 2>$null
         if ($LASTEXITCODE -ne 0) {
-            Write-Error-Custom "Docker is not installed. Please install from: https://docs.docker.com/get-docker/"
+            Write-Error-Custom "Azure CLI is not installed. Please install from: https://learn.microsoft.com/en-us/cli/azure/install-azure-cli"
             exit 1
         }
-        Write-Success "Docker is installed"
+        Write-Success "Azure CLI is installed"
+        # Check kubectl
+        Write-Info "Checking kubectl..."
+        $kubectlVersion = kubectl version --client 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error-Custom "kubectl is not installed. Please install from: https://kubernetes.io/docs/tasks/tools/"
+            exit 1
+        }
+        Write-Success "kubectl is installed"
+        # Check Maven (only if not skipping build)
+        if (-not $SkipBuild) {
+            Write-Info "Checking Maven..."
+            # Check if Maven wrapper exists
+            $mvnwPath = Join-Path $PSScriptRoot "mvnw.cmd"
+            if (Test-Path $mvnwPath) {
+                Write-Success "Maven wrapper (mvnw.cmd) found - will use it for building"
+                $script:MavenCommand = $mvnwPath
+            } else {
+                # Check for system Maven
+                $mvnVersion = mvn --version 2>$null
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Error-Custom "Maven is not installed or not in PATH, and mvnw.cmd wrapper not found."
+                    Write-Info "Please install Maven from: https://maven.apache.org/download.cgi"
+                    Write-Info "Alternatively, run the script with -SkipBuild flag if images are already built"
+                    exit 1
+                }
+                Write-Success "Maven is installed"
+                $script:MavenCommand = "mvn"
+            }
+            # Check Docker
+            Write-Info "Checking Docker..."
+            $dockerVersion = docker --version 2>$null
+            if ($LASTEXITCODE -ne 0) {
+                Write-Error-Custom "Docker is not installed. Please install from: https://docs.docker.com/get-docker/"
+                exit 1
+            }
+            Write-Success "Docker is installed"
+        }
+        Write-Success "All prerequisites met"
     }
-    
-    Write-Success "All prerequisites met"
 
     # ============================================
     # STEP 1: Azure Login
     # ============================================
     if (-not $SkipLogin) {
-        Write-Step "STEP 1: Logging into Azure"
-        
-        # Check if already logged in
-        $account = az account show 2>$null | ConvertFrom-Json
-        if ($account) {
-            Write-Success "Already logged in as: $($account.user.name)"
-            Write-Info "Subscription: $($account.name) ($($account.id))"
-        } else {
-            Write-Info "Logging into Azure..."
-            az login
-            if ($LASTEXITCODE -ne 0) {
-                throw "Azure login failed"
+        if ($StartFromStep -le 1) {
+            Write-Step "STEP 1: Logging into Azure"
+            # Check if already logged in
+            $account = az account show 2>$null | ConvertFrom-Json
+            if ($account) {
+                Write-Success "Already logged in as: $($account.user.name)"
+                Write-Info "Subscription: $($account.name) ($($account.id))"
+            } else {
+                Write-Info "Logging into Azure..."
+                az login
+                if ($LASTEXITCODE -ne 0) {
+                    throw "Azure login failed"
+                }
+                Write-Success "Successfully logged into Azure"
             }
-            Write-Success "Successfully logged into Azure"
+        } else {
+            Write-Info "Skipping Azure login (-SkipLogin flag set or StartFromStep > 1)"
         }
-    } else {
-        Write-Info "Skipping Azure login (-SkipLogin flag set)"
     }
 
     # ============================================
     # STEP 2: Create Resource Group
     # ============================================
     if (-not $SkipResourceCreation) {
-        Write-Step "STEP 2: Creating Resource Group"
-        
-        $rgExists = az group exists --name $ResourceGroupName | ConvertFrom-Json
-        if ($rgExists) {
-            Write-Info "Resource group '$ResourceGroupName' already exists"
-        } else {
-            Write-Info "Creating resource group: $ResourceGroupName in $Location"
-            az group create --name $ResourceGroupName --location $Location
-            if ($LASTEXITCODE -ne 0) {
-                throw "Failed to create resource group"
-            }
-            Write-Success "Resource group created successfully"
-        }
-        
-        # Register required resource providers
-        Write-Info "Registering required Azure resource providers..."
-        $providers = @(
-            "Microsoft.ContainerRegistry",
-            "Microsoft.ContainerService", 
-            "Microsoft.Insights",
-            "Microsoft.DBforPostgreSQL",
-            "Microsoft.OperationalInsights"
-        )
-        
-        foreach ($provider in $providers) {
-            Write-Info "Checking provider: $provider"
-            $providerStatus = az provider show --namespace $provider --query "registrationState" -o tsv 2>&1
-            if ($providerStatus -ne "Registered") {
-                Write-Info "Registering $provider..."
-                az provider register --namespace $provider --wait
+        if ($StartFromStep -le 2) {
+            Write-Step "STEP 2: Creating Resource Group"
+            $rgExists = az group exists --name $ResourceGroupName | ConvertFrom-Json
+            if ($rgExists) {
+                Write-Info "Resource group '$ResourceGroupName' already exists"
             } else {
-                Write-Info "$provider already registered"
+                Write-Info "Creating resource group: $ResourceGroupName in $Location"
+                az group create --name $ResourceGroupName --location $Location
+                if ($LASTEXITCODE -ne 0) {
+                    throw "Failed to create resource group"
+                }
+                Write-Success "Resource group created successfully"
             }
+            # Register required resource providers
+            Write-Info "Registering required Azure resource providers..."
+            $providers = @(
+                "Microsoft.ContainerRegistry",
+                "Microsoft.ContainerService", 
+                "Microsoft.Insights",
+                "Microsoft.DBforPostgreSQL",
+                "Microsoft.OperationalInsights"
+            )
+            foreach ($provider in $providers) {
+                Write-Info "Checking provider: $provider"
+                $providerStatus = az provider show --namespace $provider --query "registrationState" -o tsv 2>&1
+                if ($providerStatus -ne "Registered") {
+                    Write-Info "Registering $provider..."
+                    az provider register --namespace $provider --wait
+                } else {
+                    Write-Info "$provider already registered"
+                }
+            }
+            Write-Success "All required resource providers are registered"
+        } else {
+            Write-Info "Skipping resource group creation (StartFromStep > 2 or -SkipResourceCreation)"
         }
-        Write-Success "All required resource providers are registered"
-    } else {
-        Write-Info "Skipping resource group creation"
     }
 
     # ============================================
     # STEP 3: Create Azure Container Registry
     # ============================================
     if (-not $SkipResourceCreation) {
-        Write-Step "STEP 3: Creating Azure Container Registry"
-        
-        # Check if ACR exists (in current resource group)
-        Write-Info "Checking if ACR exists in resource group '$ResourceGroupName'..."
-        $previousErrorActionPreference = $ErrorActionPreference
-        $ErrorActionPreference = 'SilentlyContinue'
-        $acrCheck = az acr show --name $AcrName --resource-group $ResourceGroupName 2>&1
-        $acrExistsInRg = $?
-        $ErrorActionPreference = $previousErrorActionPreference
-        
-        if ($acrExistsInRg) {
-            Write-Success "ACR '$AcrName' already exists in resource group"
+        if ($StartFromStep -le 3) {
+            Write-Step "STEP 3: Creating Azure Container Registry"
+            # ...existing code...
         } else {
-            # Check if ACR exists globally (might be in different RG)
-            Write-Info "Checking if ACR '$AcrName' exists globally..."
-            $previousErrorActionPreference = $ErrorActionPreference
-            $ErrorActionPreference = 'SilentlyContinue'
-            $acrGlobalCheck = az acr show --name $AcrName 2>&1
-            $acrExistsGlobally = $?
-            $ErrorActionPreference = $previousErrorActionPreference
-            
-            if ($acrExistsGlobally) {
-                Write-Success "ACR '$AcrName' exists and is accessible"
-                Write-Info "Using existing ACR (may be in a different resource group)"
-            } else {
-                Write-Info "Creating ACR: $AcrName"
-                az acr create `
-                    --resource-group $ResourceGroupName `
-                    --name $AcrName `
-                    --sku Basic `
-                    --admin-enabled true
-                
-                if ($LASTEXITCODE -ne 0) {
-                    Write-Error-Custom "Failed to create ACR. The DNS name '$AcrName.azurecr.io' may be taken by another subscription."
-                    Write-Info "Please choose a different ACR name using: -AcrName parameter"
-                    throw "Failed to create ACR"
-                }
-                Write-Success "ACR created successfully"
-                
-                # Wait for ACR to be fully provisioned
-                Write-Info "Waiting for ACR to be ready..."
-                Start-Sleep -Seconds 10
-            }
+            Write-Info "Skipping ACR creation (StartFromStep > 3 or -SkipResourceCreation)"
         }
-        
-        # Get ACR credentials
-        Write-Info "Retrieving ACR credentials..."
-        $previousErrorActionPreference = $ErrorActionPreference
-        $ErrorActionPreference = 'SilentlyContinue'
-        
-        # Try to get credentials - first try with resource group, then without
-        $acrPassword = az acr credential show --name $AcrName --query "passwords[0].value" -o tsv 2>&1
-        $credResult = $?
-        $ErrorActionPreference = $previousErrorActionPreference
-        
-        if (-not $credResult) {
-            Write-Error-Custom "Failed to retrieve ACR credentials. You may not have access to this ACR."
-            throw "Failed to retrieve ACR credentials"
-        }
-        Write-Success "ACR credentials retrieved"
-    } else {
-        Write-Info "Skipping ACR creation"
     }
 
     # ============================================
     # STEP 4: Create Azure Kubernetes Service
     # ============================================
     if (-not $SkipResourceCreation) {
-        Write-Step "STEP 4: Creating Azure Kubernetes Service"
-        
-        # Check if AKS exists
-        Write-Info "Checking if AKS cluster exists..."
-        $previousErrorActionPreference = $ErrorActionPreference
-        $ErrorActionPreference = 'SilentlyContinue'
-        $aksCheck = az aks show --name $AksName --resource-group $ResourceGroupName 2>&1
-        $aksExists = $?
-        $ErrorActionPreference = $previousErrorActionPreference
-        
-        if ($aksExists) {
-            Write-Info "AKS cluster '$AksName' already exists"
+        if ($StartFromStep -le 4) {
+            Write-Step "STEP 4: Creating Azure Kubernetes Service"
+            # ...existing code...
         } else {
-            Write-Info "Creating AKS cluster: $AksName (this may take 10-15 minutes)"
-            az aks create `
-                --resource-group $ResourceGroupName `
-                --name $AksName `
-                --node-count $AksNodeCount `
-                --node-vm-size $AksNodeSize `
-                --enable-addons monitoring `
-                --generate-ssh-keys `
-                --attach-acr $AcrName
-            
-            if ($LASTEXITCODE -ne 0) {
-                throw "Failed to create AKS cluster"
-            }
-            Write-Success "AKS cluster created successfully"
+            Write-Info "Skipping AKS creation (StartFromStep > 4 or -SkipResourceCreation)"
         }
-        
-        # Get AKS credentials
-        Write-Info "Getting AKS credentials..."
-        az aks get-credentials --resource-group $ResourceGroupName --name $AksName --overwrite-existing
-        if ($LASTEXITCODE -ne 0) {
-            throw "Failed to get AKS credentials"
-        }
-        Write-Success "AKS credentials configured"
-        
-        # Verify connection
-        Write-Info "Verifying AKS connection..."
-        kubectl get nodes
-        Write-Success "Successfully connected to AKS cluster"
-    } else {
-        Write-Info "Skipping AKS creation"
     }
+# ============================================
+# STEP 5: Create Azure PostgreSQL Flexible Server + Database
+# ============================================
+if (-not $SkipResourceCreation) {
+    Write-Step "STEP 5: Creating Azure PostgreSQL Flexible Server"
 
-    # ============================================
-    # STEP 5: Create Azure SQL Database
-    # ============================================
-    if (-not $SkipResourceCreation) {
-        Write-Step "STEP 5: Creating Azure SQL Database"
-        $SqlServerName = "petclinic-sql-server"
-        $SqlAdminUser = "petclinicadmin"
-        $SqlAdminPassword = "P@ssw0rd123!"
-        $SqlDatabase = "petclinic"
+    # Check if PostgreSQL flexible server exists
+    Write-Info "Checking if PostgreSQL flexible server exists..."
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'SilentlyContinue'
+    $pgServerCheck = az postgres flexible-server show `
+        --name $PostgresServerName `
+        --resource-group $ResourceGroupName 2>&1
+    $pgServerExists = $?
+    $ErrorActionPreference = $previousErrorActionPreference
 
-        # Check if SQL server exists
-        Write-Info "Checking if SQL server exists..."
-        $previousErrorActionPreference = $ErrorActionPreference
-        $ErrorActionPreference = 'SilentlyContinue'
-        $sqlServerCheck = az sql server show --name $SqlServerName --resource-group $ResourceGroupName 2>&1
-        $sqlServerExists = $?
-        $ErrorActionPreference = $previousErrorActionPreference
+    if ($pgServerExists) {
+        Write-Info "PostgreSQL server '$PostgresServerName' already exists"
+    } else {
+        Write-Info "Creating PostgreSQL Flexible Server: $PostgresServerName"
 
-        if ($sqlServerExists) {
-            Write-Info "SQL server '$SqlServerName' already exists"
-        } else {
-            Write-Info "Creating SQL server: $SqlServerName"
-            az sql server create `
-                --name $SqlServerName `
-                --resource-group $ResourceGroupName `
-                --location $Location `
-                --admin-user $SqlAdminUser `
-                --admin-password $SqlAdminPassword
-            if ($LASTEXITCODE -ne 0) {
-                Write-Error-Custom "Failed to create SQL server in location '$Location'"
-                throw "Failed to create SQL server"
-            }
-            Write-Success "SQL server created successfully"
-        }
-
-        # Check if database exists
-        Write-Info "Checking if database '$SqlDatabase' exists..."
-        $previousErrorActionPreference = $ErrorActionPreference
-        $ErrorActionPreference = 'SilentlyContinue'
-        $sqlDbCheck = az sql db show --name $SqlDatabase --server $SqlServerName --resource-group $ResourceGroupName 2>&1
-        $sqlDbExists = $?
-        $ErrorActionPreference = $previousErrorActionPreference
-
-        if ($sqlDbExists) {
-            Write-Success "Database '$SqlDatabase' already exists"
-        } else {
-            Write-Info "Creating database: $SqlDatabase"
-            az sql db create `
-                --name $SqlDatabase `
-                --server $SqlServerName `
-                --resource-group $ResourceGroupName `
-                --service-objective S0
-            if ($LASTEXITCODE -ne 0) {
-                Write-Error-Custom "Failed to create SQL database, but continuing..."
-            } else {
-                Write-Success "Database created successfully"
-            }
-        }
-
-        # Configure firewall rule for Azure services
-        Write-Info "Configuring firewall rule for Azure services..."
-        az sql server firewall-rule create `
+        az postgres flexible-server create `
             --resource-group $ResourceGroupName `
-            --server $SqlServerName `
-            --name AllowAzureServices `
-            --start-ip-address 0.0.0.0 `
-            --end-ip-address 0.0.0.0
-        Write-Success "Firewall rule configured"
+            --name $PostgresServerName `
+            --location $Location `
+            --admin-user $PostgresAdminUser `
+            --admin-password $PostgresAdminPassword `
+            --sku-name Standard_B1ms `
+            --tier Burstable `
+            --storage-size 32 `
+            --version 15 `
+            --public-access 0.0.0.0-255.255.255.255
 
-        # Get SQL connection string
-        $sqlHost = az sql server show --name $SqlServerName --resource-group $ResourceGroupName --query "fullyQualifiedDomainName" -o tsv
-        $sqlConnectionString = "jdbc:sqlserver://$sqlHost:1433;database=$SqlDatabase;user=$SqlAdminUser@$SqlServerName;password=$SqlAdminPassword;encrypt=true;trustServerCertificate=false;hostNameInCertificate=*.database.windows.net;loginTimeout=30;"
-        Write-Info "SQL Server Host: $sqlHost"
-        Write-Info "JDBC Connection String: $sqlConnectionString"
-    } else {
-        Write-Info "Skipping SQL Database creation"
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error-Custom "Failed to create PostgreSQL server"
+            throw "Failed to create PostgreSQL server"
+        }
+        Write-Success "PostgreSQL server created successfully"
     }
+
+    # Check if database exists
+    Write-Info "Checking if database '$PostgresDatabase' exists..."
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'SilentlyContinue'
+    $pgDbCheck = az postgres flexible-server db show `
+        --resource-group $ResourceGroupName `
+        --server-name $PostgresServerName `
+        --database-name $PostgresDatabase 2>&1
+    $pgDbExists = $?
+    $ErrorActionPreference = $previousErrorActionPreference
+
+    if ($pgDbExists) {
+        Write-Success "Database '$PostgresDatabase' already exists"
+    } else {
+        Write-Info "Creating PostgreSQL database: $PostgresDatabase"
+
+        az postgres flexible-server db create `
+            --resource-group $ResourceGroupName `
+            --server-name $PostgresServerName `
+            --database-name $PostgresDatabase
+
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error-Custom "Failed to create PostgreSQL database"
+        } else {
+            Write-Success "PostgreSQL database created successfully"
+        }
+    }
+
+    # Get PostgreSQL connection string
+    $pgHost = az postgres flexible-server show `
+        --name $PostgresServerName `
+        --resource-group $ResourceGroupName `
+        --query "fullyQualifiedDomainName" -o tsv
+
+    $pgConnectionString = "jdbc:postgresql://$pgHost:5432/$PostgresDatabase?user=$PostgresAdminUser&password=$PostgresAdminPassword"
+
+    Write-Info "PostgreSQL Host: $pgHost"
+    Write-Info "JDBC Connection String: $pgConnectionString"
+}
 
     # ============================================
     # STEP 6: Build and Push Docker Images
@@ -465,7 +371,7 @@ try {
         Write-Info "Deploying PetClinic with monitoring stack..."
         
         $ErrorActionPreference = "Continue"
-        kubectl apply -f k8s/petclinic-with-monitoring.yaml 2>&1 | Out-Null
+        kubectl apply -f k8s/petclinic-with-monitoring-postgres.yaml.yaml 2>&1 | Out-Null
         $deployResult = $LASTEXITCODE
         $ErrorActionPreference = "Stop"
         
@@ -635,13 +541,13 @@ try {
         ACR = "$AcrName.azurecr.io"
         AKS = $AksName
         SqlServer = "petclinic-sql-server"
-        SqlDatabase = "petclinic"
+        PostgresDatabase = "petclinic"
         PetClinicURL = if ($apiGatewayIP) { "http://$apiGatewayIP" } else { "Pending" }
         GrafanaURL = if ($grafanaIP) { "http://$grafanaIP" } else { "Pending" }
         MCPEndpoints = @{
             Prometheus = "http://localhost:8090"
             Grafana = "http://localhost:8091"
-            SQL = "jdbc:sqlserver://petclinic-sql-server.database.windows.net:1433;database=petclinic;user=petclinicadmin@petclinic-sql-server;password=P@ssw0rd123!;encrypt=true;trustServerCertificate=false;hostNameInCertificate=*.database.windows.net;loginTimeout=30;"
+            SQL = "jdbc:postgresql://petclinic-postgresql-server.database.windows.net:1433;database=petclinic;user=petclinicadmin@petclinic-sql-server;password=P@ssw0rd123!;encrypt=true;trustServerCertificate=false;hostNameInCertificate=*.database.windows.net;loginTimeout=30;"
         }
     }
     
