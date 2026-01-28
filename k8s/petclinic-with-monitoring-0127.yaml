@@ -792,7 +792,7 @@ metadata:
   name: prometheus
   namespace: petclinic
 spec:
-  type: ClusterIP
+  type: LoadBalancer
   selector:
     app: prometheus
   ports:
