@@ -10,3 +10,25 @@ scrape_configs:
           - visits-service:8082
           - vets-service:8083
           - api-gateway:8080
+
+  # Optional Kubernetes metrics scrapes (AKS/K8s).
+  # Expose these endpoints to this Docker host using kubectl port-forward, then keep these targets as-is.
+  # Example:
+  #   kubectl -n kube-system port-forward svc/kube-state-metrics 8085:8080
+  #   kubectl port-forward --namespace kube-system <kubelet-or-metrics-proxy> 8086:10250
+  - job_name: 'k8s-kube-state-metrics'
+    static_configs:
+      - targets:
+          - host.docker.internal:8085
+
+  - job_name: 'k8s-kubelet-cadvisor'
+    metrics_path: '/metrics/cadvisor'
+    scheme: http
+    static_configs:
+      - targets:
+          - host.docker.internal:8086
+
+  - job_name: 'k8s-apiserver'
+    static_configs:
+      - targets:
+          - host.docker.internal:6443

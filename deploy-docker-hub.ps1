@@ -283,7 +283,7 @@ try {
         Write-Step "STEP 7: Deploy PetClinic with Observability"
 
         Write-Info "Applying PetClinic + monitoring manifests..."
-        kubectl apply -f k8s/petclinic-with-monitoring-postgres.yaml
+        kubectl apply -f k8s/petclinic-with-monitoring-0127.yaml
         Write-OK "PetClinic manifests applied"
 
         Write-Info "Waiting for core services to become ready..."

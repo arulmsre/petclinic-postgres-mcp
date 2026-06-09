@@ -7,6 +7,49 @@ This microservices branch was initially derived from [AngularJS version](https:/
 To achieve that goal, we use Spring Cloud Gateway, Spring Cloud Circuit Breaker, Spring Cloud Config, Micrometer Tracing, Resilience4j, Open Telemetry 
 and the Eureka Service Discovery from the [Spring Cloud Netflix](https://github.com/spring-cloud/spring-cloud-netflix) technology stack.
 
+## Quick Start
+
+Run the application on Windows with Docker Compose:
+
+1. Open PowerShell in the repository root.
+2. Build the Spring Boot artifacts:
+
+```powershell
+.\mvnw.cmd clean install -DskipTests
+```
+
+3. Start the full stack:
+
+```powershell
+docker compose up --build -d
+```
+
+4. Open the application in your browser:
+
+```text
+http://localhost:8080
+```
+
+5. Optional monitoring endpoints:
+
+```text
+http://localhost:3010   Grafana
+http://localhost:9091   Prometheus
+http://localhost:8761   Eureka
+```
+
+6. Optional Kubernetes metric forwards for the Grafana K8s dashboard:
+
+```powershell
+.\scripts\start-k8s-portforwards.ps1
+```
+
+Stop the forwards with:
+
+```powershell
+.\scripts\stop-k8s-portforwards.ps1
+```
+
 ## Starting services locally without Docker
 
 Every microservice is a Spring Boot application and can be started locally using IDE ([Lombok](https://projectlombok.org/) plugin has to be set up) or `../mvnw spring-boot:run` command. Please note that supporting services (Config and Discovery Server) must be started before any other application (Customers, Vets, Visits and API).
@@ -18,7 +61,7 @@ If everything goes well, you can access the following services at given location
 * Customers, Vets and Visits Services - random port, check Eureka Dashboard 
 * Tracing Server (Zipkin) - http://localhost:9411/zipkin/ (we use [openzipkin](https://github.com/openzipkin/zipkin/tree/main/zipkin-server))
 * Admin Server (Spring Boot Admin) - http://localhost:9090
-* Grafana Dashboards - http://localhost:3000
+* Grafana Dashboards - http://localhost:3010
 * Prometheus - http://localhost:9091
 
 You can tell Config Server to use your local Git repository by using `native` Spring profile and setting
@@ -45,6 +88,25 @@ For instance, if you target container images for an Apple M2, you could use the 
 
 Once images are ready, you can start them with a single command
 `docker-compose up` or `podman-compose up`. 
+
+### Optional: start Kubernetes metric port-forwards for Grafana K8s dashboards (Windows)
+If you are running this stack locally but want Kubernetes metrics (for example `kube_*` and `container_*` panels),
+start the helper script in a PowerShell terminal:
+
+```powershell
+.\scripts\start-k8s-portforwards.ps1
+```
+
+This starts background forwards expected by `prometheus.yaml`:
+
+* `localhost:8085` -> `kube-state-metrics`
+* `localhost:8086` -> `kubelet/cadvisor` endpoint
+
+To stop them:
+
+```powershell
+.\scripts\stop-k8s-portforwards.ps1
+```
 
 Containers startup order is coordinated with the `service_healthy` condition of the Docker Compose [depends-on](https://github.com/compose-spec/compose-spec/blob/main/spec.md#depends_on) expression 
 and the [healthcheck](https://github.com/compose-spec/compose-spec/blob/main/spec.md#healthcheck) of the service containers. 
@@ -130,7 +192,7 @@ A JMeter load testing script is available to stress the application and generate
 ### Using Grafana with Prometheus
 
 * An anonymous access and a Prometheus datasource are setup.
-* A `Spring Petclinic Metrics` Dashboard is available at the URL http://localhost:3000/d/69JXeR0iw/spring-petclinic-metrics.
+* A `Spring Petclinic Metrics` Dashboard is available at the URL http://localhost:3010/d/69JXeR0iw/spring-petclinic-metrics.
 You will find the JSON configuration file here: [docker/grafana/dashboards/grafana-petclinic-dashboard.json]().
 * You may create your own dashboard or import the [Micrometer/SpringBoot dashboard](https://grafana.com/dashboards/4701) via the Import Dashboard menu item.
 The id for this dashboard is `4701`.

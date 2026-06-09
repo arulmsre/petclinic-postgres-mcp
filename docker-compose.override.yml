@@ -4,51 +4,57 @@ services:
       context: ./spring-petclinic-discovery-server
       dockerfile: ../docker/Dockerfile
       args:
-        ARTIFACT_NAME: spring-petclinic-discovery-server-3.2.4
+        ARTIFACT_NAME: target/spring-petclinic-discovery-server-3.2.4
     environment:
       - JAVA_TOOL_OPTIONS=
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888/
 
   customers-service:
     build:
       context: ./spring-petclinic-customers-service
       dockerfile: ../docker/Dockerfile
       args:
-        ARTIFACT_NAME: spring-petclinic-customers-service-3.2.4
+        ARTIFACT_NAME: target/spring-petclinic-customers-service-3.2.4
     environment:
       - JAVA_TOOL_OPTIONS=
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888/
 
   visits-service:
     build:
       context: ./spring-petclinic-visits-service
       dockerfile: ../docker/Dockerfile
       args:
-        ARTIFACT_NAME: spring-petclinic-visits-service-3.2.4
+        ARTIFACT_NAME: target/spring-petclinic-visits-service-3.2.4
     environment:
       - JAVA_TOOL_OPTIONS=
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888/
 
   vets-service:
     build:
       context: ./spring-petclinic-vets-service
       dockerfile: ../docker/Dockerfile
       args:
-        ARTIFACT_NAME: spring-petclinic-vets-service-3.2.4
+        ARTIFACT_NAME: target/spring-petclinic-vets-service-3.2.4
     environment:
       - JAVA_TOOL_OPTIONS=
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888/
 
   api-gateway:
     build:
       context: ./spring-petclinic-api-gateway
       dockerfile: ../docker/Dockerfile
       args:
-        ARTIFACT_NAME: spring-petclinic-api-gateway-3.2.4
+        ARTIFACT_NAME: target/spring-petclinic-api-gateway-3.2.4
     environment:
       - JAVA_TOOL_OPTIONS=
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888/
 
   admin-server:
     build:
       context: ./spring-petclinic-admin-server
       dockerfile: ../docker/Dockerfile
       args:
-        ARTIFACT_NAME: spring-petclinic-admin-server-3.2.4
+        ARTIFACT_NAME: target/spring-petclinic-admin-server-3.2.4
     environment:
       - JAVA_TOOL_OPTIONS=
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888/
