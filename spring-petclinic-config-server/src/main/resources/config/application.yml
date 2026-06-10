@@ -89,3 +89,18 @@ spring:
       schema-locations: classpath*:db/mysql/schema.sql
       data-locations: classpath*:db/mysql/data.sql
       init: ALWAYS
+
+---
+spring:
+  config:
+    activate:
+      on-profile: postgres
+  datasource:
+    url: jdbc:postgresql://db.lcdziksqoeanqkkhfdwh.supabase.co:5432/postgres?sslmode=require
+    username: postgres
+    password: Samsaran@2011
+  sql:
+    init:
+      schema-locations: classpath*:db/postgres/schema.sql
+      data-locations: classpath*:db/postgres/data.sql
+      mode: ALWAYS

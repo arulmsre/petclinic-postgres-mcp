@@ -8,6 +8,7 @@ services:
     environment:
       - JAVA_TOOL_OPTIONS=
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888/
+      - SPRING_PROFILES_ACTIVE=docker
 
   customers-service:
     build:
@@ -18,6 +19,13 @@ services:
     environment:
       - JAVA_TOOL_OPTIONS=
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888/
+      - SPRING_PROFILES_ACTIVE=docker,postgres
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5433/postgres?sslmode=require
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=Samsaran@2026
+      - SPRING_SQL_INIT_SCHEMA_LOCATIONS=classpath*:db/postgres/schema.sql
+      - SPRING_SQL_INIT_DATA_LOCATIONS=classpath*:db/postgres/data.sql
+      - SPRING_SQL_INIT_MODE=always
 
   visits-service:
     build:
@@ -28,6 +36,13 @@ services:
     environment:
       - JAVA_TOOL_OPTIONS=
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888/
+      - SPRING_PROFILES_ACTIVE=docker,postgres
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5433/postgres?sslmode=require
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=Samsaran@2026
+      - SPRING_SQL_INIT_SCHEMA_LOCATIONS=classpath*:db/postgres/schema.sql
+      - SPRING_SQL_INIT_DATA_LOCATIONS=classpath*:db/postgres/data.sql
+      - SPRING_SQL_INIT_MODE=always
 
   vets-service:
     build:
@@ -38,6 +53,13 @@ services:
     environment:
       - JAVA_TOOL_OPTIONS=
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888/
+      - SPRING_PROFILES_ACTIVE=docker,postgres
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5433/postgres?sslmode=require
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=Samsaran@2026
+      - SPRING_SQL_INIT_SCHEMA_LOCATIONS=classpath*:db/postgres/schema.sql
+      - SPRING_SQL_INIT_DATA_LOCATIONS=classpath*:db/postgres/data.sql
+      - SPRING_SQL_INIT_MODE=always
 
   api-gateway:
     build:
@@ -48,6 +70,7 @@ services:
     environment:
       - JAVA_TOOL_OPTIONS=
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888/
+      - SPRING_PROFILES_ACTIVE=docker
 
   admin-server:
     build:
@@ -58,3 +81,4 @@ services:
     environment:
       - JAVA_TOOL_OPTIONS=
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888/
+      - SPRING_PROFILES_ACTIVE=docker
