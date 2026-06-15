@@ -9,6 +9,7 @@ services:
       - JAVA_TOOL_OPTIONS=
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888/
       - SPRING_PROFILES_ACTIVE=docker
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://tracing-server:9411/api/v2/spans
 
   customers-service:
     build:
@@ -20,6 +21,7 @@ services:
       - JAVA_TOOL_OPTIONS=
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888/
       - SPRING_PROFILES_ACTIVE=docker,postgres
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://tracing-server:9411/api/v2/spans
       - SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5433/postgres?sslmode=require
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=Samsaran@2026
@@ -37,6 +39,7 @@ services:
       - JAVA_TOOL_OPTIONS=
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888/
       - SPRING_PROFILES_ACTIVE=docker,postgres
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://tracing-server:9411/api/v2/spans
       - SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5433/postgres?sslmode=require
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=Samsaran@2026
@@ -54,6 +57,7 @@ services:
       - JAVA_TOOL_OPTIONS=
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888/
       - SPRING_PROFILES_ACTIVE=docker,postgres
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://tracing-server:9411/api/v2/spans
       - SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5433/postgres?sslmode=require
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=Samsaran@2026
@@ -71,6 +75,7 @@ services:
       - JAVA_TOOL_OPTIONS=
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888/
       - SPRING_PROFILES_ACTIVE=docker
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://tracing-server:9411/api/v2/spans
 
   admin-server:
     build:
@@ -82,3 +87,8 @@ services:
       - JAVA_TOOL_OPTIONS=
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888/
       - SPRING_PROFILES_ACTIVE=docker
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://tracing-server:9411/api/v2/spans
+
+  grafana-server:
+    environment:
+      - GF_DATABASE_PASSWORD=Samsaran@2026

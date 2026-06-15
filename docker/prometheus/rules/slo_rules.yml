@@ -1,0 +1,122 @@
+groups:
+  - name: slo_request_rates
+    interval: 30s
+    rules:
+      # Total request rate per service
+      - record: job:http_server_requests:rate5m
+        expr: >
+          sum by (job) (
+            rate(http_server_requests_seconds_count[5m])
+          )
+
+      # Server error rate per service (5xx)
+      - record: job:http_server_requests_errors:rate5m
+        expr: >
+          sum by (job) (
+            rate(http_server_requests_seconds_count{outcome="SERVER_ERROR"}[5m])
+          )
+
+      # Client error rate per service (4xx)
+      - record: job:http_server_requests_client_errors:rate5m
+        expr: >
+          sum by (job) (
+            rate(http_server_requests_seconds_count{outcome="CLIENT_ERROR"}[5m])
+          )
+
+      # Availability = 1 - (server errors / total requests)
+      - record: job:http_server_requests_availability:rate5m
+        expr: >
+          1 - (
+            job:http_server_requests_errors:rate5m
+            /
+            clamp_min(job:http_server_requests:rate5m, 0.0001)
+          )
+
+  - name: slo_latency
+    interval: 30s
+    rules:
+      # p50 latency per service
+      - record: job:http_server_requests_duration_p50:rate5m
+        expr: >
+          histogram_quantile(0.50,
+            sum by (job, le) (
+              rate(http_server_requests_seconds_bucket[5m])
+            )
+          )
+
+      # p95 latency per service
+      - record: job:http_server_requests_duration_p95:rate5m
+        expr: >
+          histogram_quantile(0.95,
+            sum by (job, le) (
+              rate(http_server_requests_seconds_bucket[5m])
+            )
+          )
+
+      # p99 latency per service
+      - record: job:http_server_requests_duration_p99:rate5m
+        expr: >
+          histogram_quantile(0.99,
+            sum by (job, le) (
+              rate(http_server_requests_seconds_bucket[5m])
+            )
+          )
+
+  - name: slo_error_budget
+    interval: 1m
+    rules:
+      # 30-day error budget consumed (target: 99.9% availability = 0.1% error budget)
+      # Budget remaining = (allowed_errors - actual_errors) / allowed_errors
+      - record: job:slo_error_budget_remaining:rate30d
+        expr: >
+          1 - (
+            (1 - avg_over_time(job:http_server_requests_availability:rate5m[30d]))
+            / 0.001
+          )
+
+  - name: slo_alerts
+    rules:
+      # Fast burn: consuming error budget 14x faster than allowed (page-worthy)
+      - alert: SLOErrorBudgetFastBurn
+        expr: >
+          (
+            rate(http_server_requests_seconds_count{outcome="SERVER_ERROR"}[1h])
+            /
+            clamp_min(rate(http_server_requests_seconds_count[1h]), 0.0001)
+          ) > 14 * 0.001
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Fast error budget burn on {{ $labels.job }}"
+          description: >
+            {{ $labels.job }} is burning error budget 14x faster than allowed.
+            Current error rate: {{ $value | humanizePercentage }}.
+
+      # Slow burn: consuming error budget 2x faster (ticket-worthy)
+      - alert: SLOErrorBudgetSlowBurn
+        expr: >
+          (
+            rate(http_server_requests_seconds_count{outcome="SERVER_ERROR"}[6h])
+            /
+            clamp_min(rate(http_server_requests_seconds_count[6h]), 0.0001)
+          ) > 2 * 0.001
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow error budget burn on {{ $labels.job }}"
+          description: >
+            {{ $labels.job }} is burning error budget 2x faster than allowed.
+
+      # Latency SLO breach — p99 > 1s
+      - alert: SLOLatencyP99Breach
+        expr: job:http_server_requests_duration_p99:rate5m > 1.0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "p99 latency SLO breach on {{ $labels.job }}"
+          description: >
+            {{ $labels.job }} p99 latency is {{ $value | humanizeDuration }},
+            exceeding the 1s SLO target.

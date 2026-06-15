@@ -11,3 +11,38 @@ datasources:
   is_default: true
   version: 1
   editable: true
+
+- name: Loki
+  type: loki
+  access: proxy
+  org_id: 1
+  url: http://loki:3100
+  version: 1
+  editable: true
+  jsonData:
+    derivedFields:
+      - datasourceUid: tempo
+        matcherRegex: 'traceId=(\w+)'
+        name: TraceID
+        url: '$${__value.raw}'
+
+- name: Tempo
+  type: tempo
+  access: proxy
+  org_id: 1
+  uid: tempo
+  url: http://tracing-server:3200
+  version: 1
+  editable: true
+  jsonData:
+    httpMethod: GET
+    tracesToLogsV2:
+      datasourceUid: loki
+      spanStartTimeShift: '-1m'
+      spanEndTimeShift: '1m'
+      filterByTraceID: true
+      filterBySpanID: false
+    serviceMap:
+      datasourceUid: prometheus
+    nodeGraph:
+      enabled: true
