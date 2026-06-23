@@ -24,6 +24,9 @@
         <td>
             <a ui-sref="petNew({ownerId: $ctrl.owner.id})" class="btn btn-default">Add New Pet</a>
         </td>
+        <td>
+            <button class="btn btn-danger" ng-click="$ctrl.deleteOwner($ctrl.owner.id)">Delete Owner</button>
+        </td>
     </tr>
 </table>
 

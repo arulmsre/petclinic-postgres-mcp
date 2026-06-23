@@ -200,6 +200,48 @@ services:
       - 9090:9090
     restart: always
 
+  app-db:
+    image: postgres:15
+    container_name: app-db
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=Samsaran@2026
+    volumes:
+      - app-db-data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: always
+
+  grafana-db:
+    image: postgres:15
+    container_name: grafana-db
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=Samsaran@2026
+    ports:
+      - 5433:5432
+    volumes:
+      - grafana-db-data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: always
+
   grafana-server:
     image: grafana/grafana
     container_name: grafana-server
@@ -216,6 +258,8 @@ services:
       config-server:
         condition: service_healthy
       discovery-server:
+        condition: service_healthy
+      grafana-db:
         condition: service_healthy
     ports:
       - 3010:3000
@@ -246,3 +290,5 @@ volumes:
   tempo-data:
   prometheus-data:
   grafana-data:
+  grafana-db-data:
+  app-db-data:
