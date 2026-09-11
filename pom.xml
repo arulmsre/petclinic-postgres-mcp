@@ -26,15 +26,13 @@
     </modules>
 
     <properties>
-        <java.version>17</java.version>
+        <java.version>25</java.version>
 
         <spring-cloud.version>2023.0.1</spring-cloud.version>
         <chaos-monkey-spring-boot.version>2.3.10</chaos-monkey-spring-boot.version>
         <jolokia-core.version>1.7.1</jolokia-core.version>
 
-        <!-- Workaround for resolving the issue while using the provided lombok dependency in upgraded Java version.
-        Should be removed while future upgrading-->
-        <lombok.version>1.18.30</lombok.version>
+        <lombok.version>1.18.48</lombok.version>
 
         <docker.image.prefix>srepetclinic</docker.image.prefix>
         <docker.image.exposed.port>9090</docker.image.exposed.port>
@@ -81,6 +79,18 @@
         </dependencies>
     </dependencyManagement>
 
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <proc>full</proc>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
     <profiles>
         <profile>
             <id>springboot</id>
@@ -103,25 +113,6 @@
                     </resource>
                 </resources>
                 <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-install-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>install-lib</id>
-                                <phase>clean</phase>
-                                <configuration>
-                                    <file>${maven.multiModuleProjectDirectory}/agents/dynamic-binded-logging-framework.jar</file>
-                                    <groupId>com.capgemini.sre.dblf</groupId>
-                                    <artifactId>dynamic-binded-logging-framework</artifactId>
-                                    <packaging>jar</packaging>
-                                </configuration>
-                                <goals>
-                                    <goal>install-file</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                    </plugin>
                     <plugin>
                         <groupId>org.springframework.boot</groupId>
                         <artifactId>spring-boot-maven-plugin</artifactId>
@@ -173,12 +164,6 @@
                         <directory>${maven.multiModuleProjectDirectory}/agents</directory>
                         <includes>
                             <include>applicationinsights.json</include>
-                        </includes>
-                    </resource>
-                    <resource>
-                        <directory>${maven.multiModuleProjectDirectory}/agents</directory>
-                        <includes>
-                            <include>dynamic-binded-logging-framework.jar</include>
                         </includes>
                     </resource>
                     <resource>
