@@ -18,10 +18,10 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Set up JDK 17
+    - name: Set up JDK 25
       uses: actions/setup-java@v4
       with:
-        java-version: '17'
+        java-version: '25'
         distribution: 'temurin'
         cache: 'maven'
 
@@ -38,7 +38,7 @@ jobs:
     - name: Build and push config-server
       run: |
         docker build -t ${{ env.ACR_LOGIN_SERVER }}/spring-petclinic-config-server:${{ env.IMAGE_TAG }} \
-          --build-arg ARTIFACT_NAME=target/spring-petclinic-config-server-3.2.4.jar \
+          --build-arg ARTIFACT_NAME=target/spring-petclinic-config-server-3.5.16.jar \
           -f docker/Dockerfile \
           ./spring-petclinic-config-server
         docker push ${{ env.ACR_LOGIN_SERVER }}/spring-petclinic-config-server:${{ env.IMAGE_TAG }}
@@ -46,7 +46,7 @@ jobs:
     - name: Build and push discovery-server
       run: |
         docker build -t ${{ env.ACR_LOGIN_SERVER }}/spring-petclinic-discovery-server:${{ env.IMAGE_TAG }} \
-          --build-arg ARTIFACT_NAME=target/spring-petclinic-discovery-server-3.2.4.jar \
+          --build-arg ARTIFACT_NAME=target/spring-petclinic-discovery-server-3.5.16.jar \
           -f docker/Dockerfile \
           ./spring-petclinic-discovery-server
         docker push ${{ env.ACR_LOGIN_SERVER }}/spring-petclinic-discovery-server:${{ env.IMAGE_TAG }}
@@ -54,7 +54,7 @@ jobs:
     - name: Build and push api-gateway
       run: |
         docker build -t ${{ env.ACR_LOGIN_SERVER }}/spring-petclinic-api-gateway:${{ env.IMAGE_TAG }} \
-          --build-arg ARTIFACT_NAME=target/spring-petclinic-api-gateway-3.2.4.jar \
+          --build-arg ARTIFACT_NAME=target/spring-petclinic-api-gateway-3.5.16.jar \
           -f docker/Dockerfile \
           ./spring-petclinic-api-gateway
         docker push ${{ env.ACR_LOGIN_SERVER }}/spring-petclinic-api-gateway:${{ env.IMAGE_TAG }}
@@ -62,7 +62,7 @@ jobs:
     - name: Build and push customers-service
       run: |
         docker build -t ${{ env.ACR_LOGIN_SERVER }}/spring-petclinic-customers-service:${{ env.IMAGE_TAG }} \
-          --build-arg ARTIFACT_NAME=target/spring-petclinic-customers-service-3.2.4.jar \
+          --build-arg ARTIFACT_NAME=target/spring-petclinic-customers-service-3.5.16.jar \
           -f docker/Dockerfile \
           ./spring-petclinic-customers-service
         docker push ${{ env.ACR_LOGIN_SERVER }}/spring-petclinic-customers-service:${{ env.IMAGE_TAG }}
@@ -70,7 +70,7 @@ jobs:
     - name: Build and push visits-service
       run: |
         docker build -t ${{ env.ACR_LOGIN_SERVER }}/spring-petclinic-visits-service:${{ env.IMAGE_TAG }} \
-          --build-arg ARTIFACT_NAME=target/spring-petclinic-visits-service-3.2.4.jar \
+          --build-arg ARTIFACT_NAME=target/spring-petclinic-visits-service-3.5.16.jar \
           -f docker/Dockerfile \
           ./spring-petclinic-visits-service
         docker push ${{ env.ACR_LOGIN_SERVER }}/spring-petclinic-visits-service:${{ env.IMAGE_TAG }}
@@ -78,7 +78,7 @@ jobs:
     - name: Build and push vets-service
       run: |
         docker build -t ${{ env.ACR_LOGIN_SERVER }}/spring-petclinic-vets-service:${{ env.IMAGE_TAG }} \
-          --build-arg ARTIFACT_NAME=target/spring-petclinic-vets-service-3.2.4.jar \
+          --build-arg ARTIFACT_NAME=target/spring-petclinic-vets-service-3.5.16.jar \
           -f docker/Dockerfile \
           ./spring-petclinic-vets-service
         docker push ${{ env.ACR_LOGIN_SERVER }}/spring-petclinic-vets-service:${{ env.IMAGE_TAG }}
@@ -86,7 +86,7 @@ jobs:
     - name: Build and push admin-server
       run: |
         docker build -t ${{ env.ACR_LOGIN_SERVER }}/spring-petclinic-admin-server:${{ env.IMAGE_TAG }} \
-          --build-arg ARTIFACT_NAME=target/spring-petclinic-admin-server-3.2.4.jar \
+          --build-arg ARTIFACT_NAME=target/spring-petclinic-admin-server-3.5.16.jar \
           -f docker/Dockerfile \
           ./spring-petclinic-admin-server
         docker push ${{ env.ACR_LOGIN_SERVER }}/spring-petclinic-admin-server:${{ env.IMAGE_TAG }}

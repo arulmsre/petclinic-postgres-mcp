@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile-upstream:master
-FROM eclipse-temurin:17 as builder
+FROM eclipse-temurin:25 as builder
 WORKDIR application
 ARG ARTIFACT_NAME
 COPY ${ARTIFACT_NAME}.jar application.jar
 RUN java -Djarmode=layertools -jar application.jar extract
 
 # syntax=docker/dockerfile-upstream:master
-FROM eclipse-temurin:17
+FROM eclipse-temurin:25
 WORKDIR application
 ARG EXPOSED_PORT
 ARG ROLE_NAME
